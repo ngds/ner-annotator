@@ -2,6 +2,7 @@ import os
 import sys
 import pickle
 from colorama import Fore, Style
+from string import punctuation
 
 
 fps = {}
@@ -65,6 +66,14 @@ def get_tag(i, word, words):
     print()
     return i
 
+def add_spacy_ann(word, tag):
+    word = word.strip(punctuation)
+    if(len(spacy_ann) != 0 and spacy_ann[-1][1] == pos and spacy_ann[-1][2] == valid_inputs[tag]):
+        spacy_ann.append((spacy_ann[-1][0], spacy_ann[-1][1] + 1 + len(word), valid_inputs[tag]))
+        spacy_ann.pop(-2)
+    else:
+        spacy_ann.append((pos + 1, pos + 1 + len(word), valid_inputs[tag]))
+
 
 def write_annotation(word, tag):
     global fileout, stanford_ann, spacy_ann, pos
@@ -75,7 +84,7 @@ def write_annotation(word, tag):
     else:
         fileout += " " + word
         stanford_ann += word + "\t" + stanford_core_tags[valid_inputs[tag]] + "\n"
-        spacy_ann.append((pos + 1, pos + 1 + len(word), valid_inputs[tag]))
+        add_spacy_ann(word, tag)
 
     pos = pos + 1 + len(word)
 
