@@ -26,15 +26,16 @@ def print_tags():
 
 def annotate(fp):
     file = fp.read()
-    for i, word in enumerate(words := file.split()):
+    words = file.split()
+    for i, word in enumerate(words):
         get_tag(i, word, words)
 
     fps["stanfordnlp-out"].write(stanford_ann)
     pickle.dump(spacy_ann, fps["spacy-out"])
     fps["rawtext-out"].write(fileout)
 
-    for filepointer in fps:
-        filepointer.close()
+    for key in fps:
+        fps[key].close()
 
 
 
@@ -93,9 +94,9 @@ if __name__ == "__main__":
         write_dir = sys.argv[2]
 
     fps["input"] = open(filename)
-    fps["stanfordnlp-out"] = open(os.path.join(write_dir, filename.split(".")[0], "-stanfordnlp.tsv"), "w+")
-    fps["spacy-out"] = open(os.path.join(write_dir, filename.split(".")[0], "-spacy.pkl"), "w+")
-    fps["rawtext-out"] = open(os.path.join(write_dir, filename.split(".")[0], "-rawtext.pkl"), "w+")
+    fps["stanfordnlp-out"] = open(os.path.join(write_dir, filename.split("/")[-1].split(".")[0]+ "-stanfordnlp.tsv"), "w+")
+    fps["spacy-out"] = open(os.path.join(write_dir, filename.split("/")[-1].split(".")[0]+ "-spacy.pkl"), "wb+")
+    fps["rawtext-out"] = open(os.path.join(write_dir, filename.split("/")[-1].split(".")[0]+ "-rawtext.txt"), "w+")
 
     annotate(open(filename))
 
@@ -105,5 +106,7 @@ error handling for files
 write to out formats
 pause mid-annotating file
 strip punctuation from spacy distances ?
+fix line endings
+make going back work for tags
 combine spacy tags
 """
