@@ -18,11 +18,14 @@ fileout = ""
 num_tokens = 0
 pos = 0
 
-def print_tags(token_idx):
+def print_status(token_idx):
     num_blocks_filled = int((token_idx/num_tokens) * 10)
     blocks_filled = '=' * num_blocks_filled
     blocks_empty = ' ' * (10 - num_blocks_filled)
     print(f"Progress: {Fore.BLUE}[{blocks_filled}{blocks_empty}]{Style.RESET_ALL} - {int(token_idx / num_tokens * 100)}% of {num_tokens} tokens")
+
+
+def print_tags():
     print("TAG OPTIONS: (press enter to leave untagged, b to go back)")
     print("0 people, including fictional\t\t4 companies, institutions, etc.")
     print("1 nationalities, religions\t\t5 countries, cities, states")
@@ -48,7 +51,8 @@ def annotate(fp):
 
 
 def get_tag(i, word, words):
-    print_tags(i)
+    print_status(i)
+    print_tags()
     for j in range(i - 3, i):
         if j >= 0:
             print(words[j] + " ", end="")
