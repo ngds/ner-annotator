@@ -15,9 +15,14 @@ stanford_core_tags = {"PERSON": "PERSON", "NORP": "O", "LOC": "LOCATION", "FAC":
 stanford_ann = ""
 spacy_ann = []
 fileout = ""
+num_tokens = 0
 pos = 0
 
-def print_tags():
+def print_tags(token_idx):
+    num_blocks_filled = int((token_idx/num_tokens) * 10)
+    blocks_filled = '=' * num_blocks_filled
+    blocks_empty = ' ' * (10 - num_blocks_filled)
+    print(f"Progress: {Fore.BLUE}[{blocks_filled}{blocks_empty}]{Style.RESET_ALL} - {int(token_idx / num_tokens * 100)}% of {num_tokens} tokens")
     print("TAG OPTIONS: (press enter to leave untagged, b to go back)")
     print("0 people, including fictional\t\t4 companies, institutions, etc.")
     print("1 nationalities, religions\t\t5 countries, cities, states")
@@ -26,8 +31,10 @@ def print_tags():
 
 
 def annotate(fp):
+    global num_tokens
     file = fp.read()
     words = file.split()
+    num_tokens = len(words)
     for i, word in enumerate(words):
         get_tag(i, word, words)
 
@@ -41,7 +48,7 @@ def annotate(fp):
 
 
 def get_tag(i, word, words):
-    print_tags()
+    print_tags(i)
     for j in range(i - 3, i):
         if j >= 0:
             print(words[j] + " ", end="")
@@ -108,7 +115,7 @@ if __name__ == "__main__":
     fps["spacy-out"] = open(os.path.join(write_dir, filename.split("/")[-1].split(".")[0]+ "-spacy.pkl"), "wb+")
     fps["rawtext-out"] = open(os.path.join(write_dir, filename.split("/")[-1].split(".")[0]+ "-rawtext.txt"), "w+", encoding="utf8")
 
-    annotate(open(filename), encoding="utf8")
+    annotate(open(filename, encoding="utf8"))
 
 
 """
