@@ -1,7 +1,7 @@
 import os
 import sys
 import pickle
-from colorama import Fore, Style
+from colorama import Fore, Style, init
 from string import punctuation
 
 
@@ -96,18 +96,19 @@ def prompt_for_file_or_dir():
 if __name__ == "__main__":
     filename = ""
     write_dir = ""
+    init()
     if len(sys.argv) < 3:
         filename = prompt_for_file_or_dir()
     else:
         filename = sys.argv[1]
         write_dir = sys.argv[2]
 
-    fps["input"] = open(filename)
-    fps["stanfordnlp-out"] = open(os.path.join(write_dir, filename.split("/")[-1].split(".")[0]+ "-stanfordnlp.tsv"), "w+")
+    fps["input"] = open(filename, encoding="utf8")
+    fps["stanfordnlp-out"] = open(os.path.join(write_dir, filename.split("/")[-1].split(".")[0]+ "-stanfordnlp.tsv"), "w+", encoding="utf8")
     fps["spacy-out"] = open(os.path.join(write_dir, filename.split("/")[-1].split(".")[0]+ "-spacy.pkl"), "wb+")
-    fps["rawtext-out"] = open(os.path.join(write_dir, filename.split("/")[-1].split(".")[0]+ "-rawtext.txt"), "w+")
+    fps["rawtext-out"] = open(os.path.join(write_dir, filename.split("/")[-1].split(".")[0]+ "-rawtext.txt"), "w+", encoding="utf8")
 
-    annotate(open(filename))
+    annotate(open(filename), encoding="utf8")
 
 
 """
