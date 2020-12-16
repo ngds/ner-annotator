@@ -1,7 +1,7 @@
 import os
 import sys
 import pickle
-from colorama import Fore, Style
+from colorama import Fore, Style, init
 from string import punctuation
 
 
@@ -12,11 +12,20 @@ valid_inputs = {"0": "PERSON", "1": "NORP", "2": "LOC", "3": "FAC",
 stanford_core_tags = {"PERSON": "PERSON", "NORP": "O", "LOC": "LOCATION", "FAC": "O",
                        "ORG": "O", "GPE": "LOCATION", "EVENT": "O", "QUANTITY": "O"}
 
-stanford_ann = ""
+stanford_ann = []
 spacy_ann = []
 fileout = ""
+num_tokens = 0
 pos = 0
 window = 5
+back = 0
+
+def print_status(token_idx):
+    num_blocks_filled = int((token_idx/num_tokens) * 10)
+    blocks_filled = '=' * num_blocks_filled
+    blocks_empty = ' ' * (10 - num_blocks_filled)
+    print(f"Progress: {Fore.BLUE}[{blocks_filled}{blocks_empty}]{Style.RESET_ALL} - {int(token_idx / num_tokens * 100)}% of {num_tokens} tokens")
+
 
 def print_tags():
     print("TAG OPTIONS: (press enter to leave untagged, b to go back)")
@@ -27,12 +36,15 @@ def print_tags():
 
 
 def annotate(fp):
+    global num_tokens
+    init()
     file = fp.read()
     words = file.split()
+    num_tokens = len(words)
     for i, word in enumerate(words):
         get_tag(i, word, words)
 
-    fps["stanfordnlp-out"].write(stanford_ann)
+    fps["stanfordnlp-out"].writelines(stanford_ann)
     pickle.dump(spacy_ann, fps["spacy-out"])
     fps["rawtext-out"].write(fileout)
 
@@ -42,6 +54,8 @@ def annotate(fp):
 
 
 def get_tag(i, word, words):
+    global back, pos
+    print_status(i)
     print_tags()
     for j in range(i - window, i):
         if j >= 0:
@@ -55,7 +69,9 @@ def get_tag(i, word, words):
 
     tag = input("\n\tTAG? ")
     if tag == "b" and i > 0:
+        back += 1
         curr = i-1
+        pos -= len(words[curr]) + 1
         while (curr <= i):
             curr = get_tag(curr, words[curr], words) + 1
     elif tag == "" or tag in valid_inputs:
@@ -64,6 +80,8 @@ def get_tag(i, word, words):
         print(f"\n{Fore.RED}Sorry, not sure what that meant. Try again.{Style.RESET_ALL}")
         get_tag(i, word, words)
 
+    if(back > 0):
+        back -= 1
     print()
     return i
 
@@ -75,28 +93,50 @@ def add_spacy_ann(word, tag):
     else:
         spacy_ann.append((pos + 1, pos + 1 + len(word), valid_inputs[tag]))
 
+def write_back_annotation(word, tag):
+    global fileout, stanford_ann, spacy_ann, pos, back
+    if tag == "":
+        stanford_ann[-back] = word + "\t" + "O" + "\n"
+    else:
+        stanford_ann[-back] = word + "\t" + stanford_core_tags[valid_inputs[tag]] + "\n"
+        word = word.strip(punctuation)
+        replaced = False
+        for i in range(back):
+            print(pos)
+            print(spacy_ann[-i][0])
+            if(len(spacy_ann) != 0 and spacy_ann[-i][0] == pos + 1):
+                print("doing something weird")
+                spacy_ann.pop(-i)
+                spacy_ann.insert(-i, ((pos + 1, pos + 1 + len(word), valid_inputs[tag])))
+                replaced = True
+        if not replaced:
+            spacy_ann.append((pos + 1, pos + 1 + len(word), valid_inputs[tag]))
+    pos = pos + 1 + len(word)
+
 
 def write_annotation(word, tag):
+    if(back != 0):
+        return write_back_annotation(word, tag)
+
     global fileout, stanford_ann, spacy_ann, pos
     left = word.lstrip(punctuation)
     right = word.rstrip(punctuation)
 
     if word != left:
-        stanford_ann += word[0:len(word) - len(left)] + "\t" + "O" + "\n"
+        stanford_ann.append(word[0:len(word) - len(left)] + "\t" + "O" + "\n")
 
     if tag == "":
         fileout += " " + word
-        stanford_ann += word.strip(punctuation) + "\t" + "O" + "\n"
+        stanford_ann.append(word.strip(punctuation) + "\t" + "O" + "\n")
     else:
         fileout += " " + word
-        stanford_ann += word.strip(punctuation) + "\t" + stanford_core_tags[valid_inputs[tag]] + "\n"
+        stanford_ann.append(word.strip(punctuation) + "\t" + stanford_core_tags[valid_inputs[tag]] + "\n")
         add_spacy_ann(word, tag)
 
     pos = pos + 1 + len(word)
 
     if word != right:
-        stanford_ann += word[len(right):] + "\t" + "O" + "\n"
-
+        stanford_ann.append(word[len(right):] + "\t" + "O" + "\n")
 
 def prompt_for_file_or_dir():
     pass
@@ -105,6 +145,7 @@ def prompt_for_file_or_dir():
 if __name__ == "__main__":
     filename = ""
     write_dir = ""
+    init()
     if len(sys.argv) < 3:
         filename = prompt_for_file_or_dir()
     else:
@@ -113,12 +154,12 @@ if __name__ == "__main__":
         if len(sys.argv) > 3:
             window = int(sys.argv[3])
 
-    fps["input"] = open(filename)
-    fps["stanfordnlp-out"] = open(os.path.join(write_dir, filename.split("/")[-1].split(".")[0]+ "-stanfordnlp.tsv"), "w+")
+    fps["input"] = open(filename, encoding="utf8")
+    fps["stanfordnlp-out"] = open(os.path.join(write_dir, filename.split("/")[-1].split(".")[0]+ "-stanfordnlp.tsv"), "w+", encoding="utf8")
     fps["spacy-out"] = open(os.path.join(write_dir, filename.split("/")[-1].split(".")[0]+ "-spacy.pkl"), "wb+")
-    fps["rawtext-out"] = open(os.path.join(write_dir, filename.split("/")[-1].split(".")[0]+ "-rawtext.txt"), "w+")
+    fps["rawtext-out"] = open(os.path.join(write_dir, filename.split("/")[-1].split(".")[0]+ "-rawtext.txt"), "w+", encoding="utf8")
 
-    annotate(open(filename))
+    annotate(open(filename, encoding="utf8"))
 
 
 """
