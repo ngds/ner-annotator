@@ -1,7 +1,7 @@
 import os
 import sys
 import pickle
-from colorama import Fore, Style
+from colorama import Fore, Style, init
 from string import punctuation
 
 
@@ -15,7 +15,15 @@ stanford_core_tags = {"PERSON": "PERSON", "NORP": "O", "LOC": "LOCATION", "FAC":
 stanford_ann = ""
 spacy_ann = []
 fileout = ""
+num_tokens = 0
 pos = 0
+
+def print_status(token_idx):
+    num_blocks_filled = int((token_idx/num_tokens) * 10)
+    blocks_filled = '=' * num_blocks_filled
+    blocks_empty = ' ' * (10 - num_blocks_filled)
+    print(f"Progress: {Fore.BLUE}[{blocks_filled}{blocks_empty}]{Style.RESET_ALL} - {int(token_idx / num_tokens * 100)}% of {num_tokens} tokens")
+
 
 def print_tags():
     print("TAG OPTIONS: (press enter to leave untagged, b to go back)")
@@ -26,8 +34,10 @@ def print_tags():
 
 
 def annotate(fp):
+    global num_tokens
     file = fp.read()
     words = file.split()
+    num_tokens = len(words)
     for i, word in enumerate(words):
         get_tag(i, word, words)
 
@@ -41,6 +51,7 @@ def annotate(fp):
 
 
 def get_tag(i, word, words):
+    print_status(i)
     print_tags()
     for j in range(i - 3, i):
         if j >= 0:
@@ -96,18 +107,19 @@ def prompt_for_file_or_dir():
 if __name__ == "__main__":
     filename = ""
     write_dir = ""
+    init()
     if len(sys.argv) < 3:
         filename = prompt_for_file_or_dir()
     else:
         filename = sys.argv[1]
         write_dir = sys.argv[2]
 
-    fps["input"] = open(filename)
-    fps["stanfordnlp-out"] = open(os.path.join(write_dir, filename.split("/")[-1].split(".")[0]+ "-stanfordnlp.tsv"), "w+")
+    fps["input"] = open(filename, encoding="utf8")
+    fps["stanfordnlp-out"] = open(os.path.join(write_dir, filename.split("/")[-1].split(".")[0]+ "-stanfordnlp.tsv"), "w+", encoding="utf8")
     fps["spacy-out"] = open(os.path.join(write_dir, filename.split("/")[-1].split(".")[0]+ "-spacy.pkl"), "wb+")
-    fps["rawtext-out"] = open(os.path.join(write_dir, filename.split("/")[-1].split(".")[0]+ "-rawtext.txt"), "w+")
+    fps["rawtext-out"] = open(os.path.join(write_dir, filename.split("/")[-1].split(".")[0]+ "-rawtext.txt"), "w+", encoding="utf8")
 
-    annotate(open(filename))
+    annotate(open(filename, encoding="utf8"))
 
 
 """
