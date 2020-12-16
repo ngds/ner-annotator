@@ -17,6 +17,7 @@ spacy_ann = []
 fileout = ""
 num_tokens = 0
 pos = 0
+window = 5
 back = 0
 
 def print_status(token_idx):
@@ -56,13 +57,13 @@ def get_tag(i, word, words):
     global back, pos
     print_status(i)
     print_tags()
-    for j in range(i - 3, i):
+    for j in range(i - window, i):
         if j >= 0:
             print(words[j] + " ", end="")
 
     print(f"{Fore.GREEN} <<" + word + f">> {Style.RESET_ALL}", end="")
 
-    for k in range(i + 1, i + 4):
+    for k in range(i + 1, i + window + 1):
         if k < len(words):
             print(" " + words[k], end="")
 
@@ -118,16 +119,24 @@ def write_annotation(word, tag):
         return write_back_annotation(word, tag)
 
     global fileout, stanford_ann, spacy_ann, pos
+    left = word.lstrip(punctuation)
+    right = word.rstrip(punctuation)
+
+    if word != left:
+        stanford_ann.append(word[0:len(word) - len(left)] + "\t" + "O" + "\n")
 
     if tag == "":
         fileout += " " + word
-        stanford_ann.append(word + "\t" + "O" + "\n")
+        stanford_ann.append(word.strip(punctuation) + "\t" + "O" + "\n")
     else:
         fileout += " " + word
-        stanford_ann.append(word + "\t" + stanford_core_tags[valid_inputs[tag]] + "\n")
+        stanford_ann.append(word.strip(punctuation) + "\t" + stanford_core_tags[valid_inputs[tag]] + "\n")
         add_spacy_ann(word, tag)
 
     pos = pos + 1 + len(word)
+
+    if word != right:
+        stanford_ann.append(word[len(right):] + "\t" + "O" + "\n")
 
 def prompt_for_file_or_dir():
     pass
@@ -142,6 +151,8 @@ if __name__ == "__main__":
     else:
         filename = sys.argv[1]
         write_dir = sys.argv[2]
+        if len(sys.argv) > 3:
+            window = int(sys.argv[3])
 
     fps["input"] = open(filename, encoding="utf8")
     fps["stanfordnlp-out"] = open(os.path.join(write_dir, filename.split("/")[-1].split(".")[0]+ "-stanfordnlp.tsv"), "w+", encoding="utf8")
