@@ -111,7 +111,6 @@ def write_back_annotation(word, tag):
         if not replaced:
             spacy_ann.append((pos + 1, pos + 1 + len(word), valid_inputs[tag]))
     pos = pos + 1 + len(word)
-    print("pos is currently " + str(pos))
 
 
 def write_annotation(word, tag):
@@ -129,7 +128,6 @@ def write_annotation(word, tag):
         add_spacy_ann(word, tag)
 
     pos = pos + 1 + len(word)
-    print("pos is currently " + str(pos))
 
 def prompt_for_file_or_dir():
     pass
