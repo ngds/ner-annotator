@@ -4,6 +4,8 @@ import pickle
 from colorama import Fore, Style, init
 from string import punctuation
 
+from token import Token
+
 
 fps = {}
 valid_inputs = {"0": "PERSON", "1": "NORP", "2": "LOC", "3": "FAC",
@@ -15,10 +17,14 @@ stanford_core_tags = {"PERSON": "PERSON", "NORP": "O", "LOC": "LOCATION", "FAC":
 stanford_ann = []
 spacy_ann = []
 fileout = ""
+
 num_tokens = 0
 pos = 0
 window = 5
 back = 0
+curr_token = 0
+internal = []
+
 
 def print_status(token_idx):
     num_blocks_filled = int((token_idx/num_tokens) * 10)
@@ -36,13 +42,15 @@ def print_tags():
 
 
 def annotate(fp):
-    global num_tokens
+    global num_tokens, curr_token, internal
     init()
     file = fp.read()
     words = file.split()
     num_tokens = len(words)
-    for i, word in enumerate(words):
-        get_tag(i, word, words)
+    while(curr_token < num_tokens):
+        get_tag(words[curr_token], words)
+
+    compute_all()
 
     fps["stanfordnlp-out"].writelines(stanford_ann)
     pickle.dump(spacy_ann, fps["spacy-out"])
@@ -51,92 +59,69 @@ def annotate(fp):
     for key in fps:
         fps[key].close()
 
+    for tok in internal:
+        print(tok)
 
-
-def get_tag(i, word, words):
-    global back, pos
-    print_status(i)
+def get_tag(curr_token_word, words):
+    global back, pos, internal, curr_token
+    print_status(curr_token)
     print_tags()
-    for j in range(i - window, i):
+    for j in range(curr_token - window, curr_token):
         if j >= 0:
             print(words[j] + " ", end="")
 
-    print(f"{Fore.GREEN} <<" + word + f">> {Style.RESET_ALL}", end="")
+    print(f"{Fore.GREEN} <<" + curr_token_word + f">> {Style.RESET_ALL}", end="")
 
-    for k in range(i + 1, i + window + 1):
+    for k in range(curr_token + 1, curr_token + window + 1):
         if k < len(words):
             print(" " + words[k], end="")
 
+    if len(internal) <= curr_token:
+        # add current token to internal list
+        internal.append(Token(words[curr_token], pos, len(words[curr_token])))
+
     tag = input("\n\tTAG? ")
-    if tag == "b" and i > 0:
-        back += 1
-        curr = i-1
-        pos -= len(words[curr]) + 1
-        while (curr <= i):
-            curr = get_tag(curr, words[curr], words) + 1
+    if tag == "b" and curr_token > 0:
+        pos -= internal[curr_token - 1].length + 1 # step back to the beginning of last word
+        curr_token -= 1
     elif tag == "" or tag in valid_inputs:
-        write_annotation(word, tag)
+        if tag in valid_inputs:
+            internal[curr_token].tag = tag
+        pos += internal[curr_token].length + 1
+        curr_token += 1
     else:
         print(f"\n{Fore.RED}Sorry, not sure what that meant. Try again.{Style.RESET_ALL}")
-        get_tag(i, word, words)
-
-    if(back > 0):
-        back -= 1
     print()
-    return i
 
-def add_spacy_ann(word, tag):
-    word = word.strip(punctuation)
-    if(len(spacy_ann) != 0 and spacy_ann[-1][1] == pos and spacy_ann[-1][2] == valid_inputs[tag]):
-        spacy_ann.append((spacy_ann[-1][0], spacy_ann[-1][1] + 1 + len(word), valid_inputs[tag]))
-        spacy_ann.pop(-2)
-    else:
-        spacy_ann.append((pos + 1, pos + 1 + len(word), valid_inputs[tag]))
-
-def write_back_annotation(word, tag):
-    global fileout, stanford_ann, spacy_ann, pos, back
-    if tag == "":
-        stanford_ann[-back] = word + "\t" + "O" + "\n"
-    else:
-        stanford_ann[-back] = word + "\t" + stanford_core_tags[valid_inputs[tag]] + "\n"
-        word = word.strip(punctuation)
-        replaced = False
-        for i in range(back):
-            print(pos)
-            print(spacy_ann[-i][0])
-            if(len(spacy_ann) != 0 and spacy_ann[-i][0] == pos + 1):
-                print("doing something weird")
-                spacy_ann.pop(-i)
-                spacy_ann.insert(-i, ((pos + 1, pos + 1 + len(word), valid_inputs[tag])))
-                replaced = True
-        if not replaced:
-            spacy_ann.append((pos + 1, pos + 1 + len(word), valid_inputs[tag]))
-    pos = pos + 1 + len(word)
+def compute_spacy_ann():
+    global internal, spacy_ann
+    for tok in internal:
+        if tok.tag != -1:
+            spacy_ann.append((tok.pos, tok.pos + tok.length, valid_inputs[tok.tag]))
 
 
-def write_annotation(word, tag):
-    if(back != 0):
-        return write_back_annotation(word, tag)
+def compute_stanford_ann():
+    global internal, stanford_ann
+    for tok in internal:
+        stanford_tag = 'O'
+        if tok.tag != -1:
+            stanford_tag = stanford_core_tags[valid_inputs[tok.tag]]
+        stanford_ann.append(tok.word + "\t" + stanford_tag + "\n")
 
-    global fileout, stanford_ann, spacy_ann, pos
-    left = word.lstrip(punctuation)
-    right = word.rstrip(punctuation)
+def compute_rawtext():
+    global fileout
+    for tok in internal:
+        fileout += tok.word + " "
 
-    if word != left:
-        stanford_ann.append(word[0:len(word) - len(left)] + "\t" + "O" + "\n")
-
-    if tag == "":
-        fileout += " " + word
-        stanford_ann.append(word.strip(punctuation) + "\t" + "O" + "\n")
-    else:
-        fileout += " " + word
-        stanford_ann.append(word.strip(punctuation) + "\t" + stanford_core_tags[valid_inputs[tag]] + "\n")
-        add_spacy_ann(word, tag)
-
-    pos = pos + 1 + len(word)
-
-    if word != right:
-        stanford_ann.append(word[len(right):] + "\t" + "O" + "\n")
+def compute_all():
+    global internal, spacy_ann, stanford_ann, fileout
+    for tok in internal:
+        fileout += tok.word + " "
+        stanford_tag = '0'
+        if tok.tag != -1:
+            stanford_tag = stanford_core_tags[valid_inputs[tok.tag]]
+            spacy_ann.append((tok.pos, tok.pos + tok.length, valid_inputs[tok.tag]))
+        stanford_ann.append(tok.word + "\t" + stanford_tag + "\n")
 
 def prompt_for_file_or_dir():
     pass
