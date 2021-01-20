@@ -1,29 +1,20 @@
-import os
 import sys
-import pickle
 from colorama import Fore, Style, init
-from string import punctuation
 
 from token import Token
+from output_types import spacy, stanfordnlp, rawtext
 
-
-fps = {}
-valid_inputs = {"0": "PERSON", "1": "NORP", "2": "LOC", "3": "FAC",
-                "4": "ORG", "5": "GPE", "6": "EVENT", "7": "QUANTITY"}
-
-stanford_core_tags = {"PERSON": "PERSON", "NORP": "O", "LOC": "LOCATION", "FAC": "O",
-                       "ORG": "O", "GPE": "LOCATION", "EVENT": "O", "QUANTITY": "O"}
-
-stanford_ann = []
-spacy_ann = []
-fileout = ""
+valid_inputs = ["0", "1", "2", "3", "4", "5", "6", "7"]
 
 num_tokens = 0
 pos = 0
 window = 5
 back = 0
 curr_token = 0
+output_dir = ""
+filename = ""
 internal = []
+annotation_types = [spacy, stanfordnlp, rawtext]
 
 
 def print_status(token_idx):
@@ -42,7 +33,8 @@ def print_tags():
 
 
 def annotate(fp):
-    global num_tokens, curr_token, internal
+    global num_tokens, curr_token, internal, filename
+    filename = filename.split("/")[-1].split(".")[0]
     init()
     file = fp.read()
     words = file.split()
@@ -51,13 +43,6 @@ def annotate(fp):
         get_tag(words[curr_token], words)
 
     compute_all()
-
-    fps["stanfordnlp-out"].writelines(stanford_ann)
-    pickle.dump(spacy_ann, fps["spacy-out"])
-    fps["rawtext-out"].write(fileout)
-
-    for key in fps:
-        fps[key].close()
 
     for tok in internal:
         print(tok)
@@ -93,56 +78,29 @@ def get_tag(curr_token_word, words):
         print(f"\n{Fore.RED}Sorry, not sure what that meant. Try again.{Style.RESET_ALL}")
     print()
 
-def compute_spacy_ann():
-    global internal, spacy_ann
-    for tok in internal:
-        if tok.tag != -1:
-            spacy_ann.append((tok.pos, tok.pos + tok.length, valid_inputs[tok.tag]))
 
-
-def compute_stanford_ann():
-    global internal, stanford_ann
-    for tok in internal:
-        stanford_tag = 'O'
-        if tok.tag != -1:
-            stanford_tag = stanford_core_tags[valid_inputs[tok.tag]]
-        stanford_ann.append(tok.word + "\t" + stanford_tag + "\n")
-
-def compute_rawtext():
-    global fileout
-    for tok in internal:
-        fileout += tok.word + " "
 
 def compute_all():
-    global internal, spacy_ann, stanford_ann, fileout
+    global internal, output_dir, filename
     for tok in internal:
-        fileout += tok.word + " "
-        stanford_tag = '0'
-        if tok.tag != -1:
-            stanford_tag = stanford_core_tags[valid_inputs[tok.tag]]
-            spacy_ann.append((tok.pos, tok.pos + tok.length, valid_inputs[tok.tag]))
-        stanford_ann.append(tok.word + "\t" + stanford_tag + "\n")
+        for output_type in annotation_types:
+            output_type.add_annotation(tok)
+    for output_type in annotation_types:
+        output_type.finalize(output_dir, filename)
 
 def prompt_for_file_or_dir():
     pass
 
 
 if __name__ == "__main__":
-    filename = ""
-    write_dir = ""
     init()
     if len(sys.argv) < 3:
         filename = prompt_for_file_or_dir()
     else:
         filename = sys.argv[1]
-        write_dir = sys.argv[2]
+        output_dir = sys.argv[2]
         if len(sys.argv) > 3:
             window = int(sys.argv[3])
-
-    fps["input"] = open(filename, encoding="utf8")
-    fps["stanfordnlp-out"] = open(os.path.join(write_dir, filename.split("/")[-1].split(".")[0]+ "-stanfordnlp.tsv"), "w+", encoding="utf8")
-    fps["spacy-out"] = open(os.path.join(write_dir, filename.split("/")[-1].split(".")[0]+ "-spacy.pkl"), "wb+")
-    fps["rawtext-out"] = open(os.path.join(write_dir, filename.split("/")[-1].split(".")[0]+ "-rawtext.txt"), "w+", encoding="utf8")
 
     annotate(open(filename, encoding="utf8"))
 
