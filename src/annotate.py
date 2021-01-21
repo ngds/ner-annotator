@@ -1,7 +1,8 @@
 import sys
 from colorama import Fore, Style, init
+from IPython.display import clear_output
 
-from token import Token
+from src.token import Token
 from output_types import spacy, stanfordnlp, rawtext
 
 valid_inputs = ["0", "1", "2", "3", "4", "5", "6", "7"]
@@ -10,6 +11,7 @@ num_tokens = 0
 pos = 0
 window = 5
 back = 0
+words = []
 curr_token = 0
 output_dir = ""
 filename = ""
@@ -31,6 +33,24 @@ def print_tags():
     print("2 mountains, rivers, etc.\t\t6 events--named hurricanes, etc")
     print("3 buildings, airports, etc.\t\t7 measurements (e.g. weight, distance)")
 
+def setup_doc():
+    from src.file_chooser import doc_loc
+    fp = open(doc_loc.selected)
+    global num_tokens, curr_token, internal, filename, words
+    curr_token = 0
+    filename = doc_loc.selected.split("/")[-1].split(".")[0]
+    init()
+    file = fp.read()
+    words = file.split()
+    num_tokens = len(words)
+    fp.close()
+
+def takedown():
+    global output_dir
+    from src.file_chooser import output_loc, doc_loc
+    output_dir = output_loc.selected
+    compute_all()
+    print("The document has been annotated! Check the output folder to see the annotations saved as files prefixed with \"" + filename + "\"")
 
 def annotate(fp):
     global num_tokens, curr_token, internal, filename
@@ -40,6 +60,7 @@ def annotate(fp):
     words = file.split()
     num_tokens = len(words)
     while(curr_token < num_tokens):
+        clear_output(wait=True)
         get_tag(words[curr_token], words)
 
     compute_all()
@@ -47,8 +68,14 @@ def annotate(fp):
     for tok in internal:
         print(tok)
 
-def get_tag(curr_token_word, words):
-    global back, pos, internal, curr_token
+def not_done():
+    global curr_token, num_tokens
+    return curr_token < num_tokens
+
+def get_tag():
+    global back, pos, internal, curr_token, words
+    curr_token_word = words[curr_token]
+    clear_output(wait=True)
     print_status(curr_token)
     print_tags()
     for j in range(curr_token - window, curr_token):
@@ -82,6 +109,11 @@ def get_tag(curr_token_word, words):
 
 def compute_all():
     global internal, output_dir, filename
+
+    # avoid duplication issue with notebook version by resetting internal values
+    for output_type in annotation_types:
+        output_type.init()
+
     for tok in internal:
         for output_type in annotation_types:
             output_type.add_annotation(tok)

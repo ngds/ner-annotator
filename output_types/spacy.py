@@ -6,6 +6,10 @@ converter = {"0": "PERSON", "1": "NORP", "2": "LOC", "3": "FAC",
              "4": "ORG", "5": "GPE", "6": "EVENT", "7": "QUANTITY"}
 filename_end = "-spacy.pkl"
 
+def init():
+    global spacy_partial
+    spacy_partial = []
+
 def add_annotation(tok):
     spacy_tag = converter.get(tok.tag, -1)
     if spacy_tag != -1:
