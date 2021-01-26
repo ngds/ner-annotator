@@ -14,7 +14,12 @@ def add_annotation(tok):
         if tok.word[0] != left_tok[0]:
             tok.pos += len(tok.word) - len(left_tok)  # move start right
         tok.length = len(clean_tok)  # moves end left, if necessary
-        spacy_partial.append((tok.pos, tok.pos + tok.length, spacy_tag))
+
+        # span selection
+        if len(spacy_partial) != 0 and spacy_partial[-1][1] == tok.pos - 1 and spacy_partial[-1][2] == spacy_tag:
+            spacy_partial[-1] = (spacy_partial[-1][0], tok.pos + tok.length, spacy_tag)
+        else:
+            spacy_partial.append((tok.pos, tok.pos + tok.length, spacy_tag))
 
 def finalize(output_folder, filename):
     import pickle

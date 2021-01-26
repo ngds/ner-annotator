@@ -1,7 +1,7 @@
 import sys
 from colorama import Fore, Style, init
 
-from token import Token
+from src.token import Token
 from output_types import spacy, stanfordnlp, rawtext
 
 valid_inputs = ["0", "1", "2", "3", "4", "5", "6", "7"]
