@@ -1,4 +1,4 @@
-from string import punctuation
+from string import punctuation, whitespace
 import os
 
 spacy_partial = []
@@ -10,7 +10,7 @@ def add_annotation(tok):
     spacy_tag = converter.get(tok.tag, -1)
     if spacy_tag != -1:
         left_tok = tok.word.lstrip(punctuation)
-        clean_tok = tok.word.strip(punctuation)
+        clean_tok = tok.word.strip(whitespace).strip(punctuation)
         if tok.word[0] != left_tok[0]:
             tok.pos += len(tok.word) - len(left_tok)  # move start right
         tok.length = len(clean_tok)  # moves end left, if necessary
