@@ -1,12 +1,12 @@
 import sys
 import os
-import time
 from datetime import date
 
 from colorama import Fore, Style, init
 
-from src.token import Token
-from output_types import spacy, stanfordnlp, rawtext
+from src.token_class import Token
+from src.output_types import spacy, stanfordnlp, rawtext
+from src.notebook import file_chooser, clear
 
 valid_inputs = ["0", "1", "2", "3", "4", "5", "6", "7"]
 
@@ -20,8 +20,10 @@ curr_token = 0
 output_dir = ""
 filename = ""
 internal = []
+words = []
 annotation_types = [spacy, stanfordnlp, rawtext]
 
+notebook_version = False
 
 def print_status(token_idx):
     num_blocks_filled = int((token_idx/num_tokens) * 10)
@@ -60,11 +62,10 @@ def get_partial():
 
 
 def annotate(fp):
-    global num_tokens, curr_token, internal, filename
+    global num_tokens, curr_token, internal, filename, words
     filename = filename.split("/")[-1].split(".")[0]
     init()
     file = fp.readlines()
-    words = []
     for line in file:
         words.extend(line.split())
         if len(line.split()) > 0:
@@ -73,7 +74,7 @@ def annotate(fp):
     num_tokens = len(words)
     get_partial()
     while(curr_token < num_tokens):
-        get_tag(words[curr_token], words)
+        get_tag()
 
     compute_all()
 
@@ -89,6 +90,69 @@ def pause():
           "set of annotations")
     sys.exit(0)
 
+
+def print_tags():
+    print("TAG OPTIONS: (press enter to leave untagged, b to go back)")
+    print("0 people, including fictional\t\t4 companies, institutions, etc.")
+    print("1 nationalities, religions\t\t5 countries, cities, states")
+    print("2 mountains, rivers, etc.\t\t6 events--named hurricanes, etc")
+    print("3 buildings, airports, etc.\t\t7 measurements (e.g. weight, distance)")
+
+def setup_doc():
+    from src.notebook.file_chooser import doc_loc
+    fp = open(doc_loc.selected)
+    global num_tokens, curr_token, internal, filename, words
+    curr_token = 0
+    filename = doc_loc.selected.split("/")[-1].split(".")[0]
+    init()
+    file = fp.read()
+    words = file.split()
+    num_tokens = len(words)
+    fp.close()
+
+def takedown():
+    global output_dir
+    from src.notebook.file_chooser import output_loc
+    output_dir = output_loc.selected
+    compute_all()
+    print("The document has been annotated! Check the output folder to see the annotations saved as files prefixed with \"" + filename + "\"")
+
+def not_done():
+    global curr_token, num_tokens
+    return curr_token < num_tokens
+
+def get_tag():
+    global back, pos, internal, curr_token, words
+    curr_token_word = words[curr_token]
+    print_status(curr_token)
+    print_tags()
+    for j in range(curr_token - window, curr_token):
+        if j >= 0:
+            print(words[j].strip('\n') + " ", end="")
+
+    print(f"{Fore.GREEN} <<" + curr_token_word.strip('\n') + f">> {Style.RESET_ALL}", end="")
+
+    for k in range(curr_token + 1, curr_token + window + 1):
+        if k < len(words):
+            print(" " + words[k].strip('\n'), end="")
+
+    if len(internal) <= curr_token:
+        # add current token to internal list
+        internal.append(Token(words[curr_token], pos, len(words[curr_token])))
+
+    tag = input("\n\tTAG? ")
+    if tag == "b" and curr_token > 0:
+        pos -= internal[curr_token - 1].length + 1 # step back to the beginning of last word
+        curr_token -= 1
+    elif tag == "" or tag in valid_inputs:
+        if tag in valid_inputs:
+            internal[curr_token].tag = tag
+        pos += internal[curr_token].length + 1
+        curr_token += 1
+    else:
+        print(f"\n{Fore.RED}Sorry, not sure what that meant. Try again.{Style.RESET_ALL}")
+    print()
+"""
 def get_tag(curr_token_word, words):
     global back, pos, internal, curr_token
     print_status(curr_token)
@@ -121,7 +185,7 @@ def get_tag(curr_token_word, words):
     else:
         print(f"\n{Fore.RED}Sorry, not sure what that meant. Try again.{Style.RESET_ALL}")
     print()
-
+"""
 
 
 def compute_all():
@@ -139,14 +203,22 @@ def prompt_for_file_or_dir():
 if __name__ == "__main__":
     init()
     if len(sys.argv) < 3:
-        filename = prompt_for_file_or_dir()
+        print(f"{Fore.RED}Please provide both a file to annotate and an output directory. Exiting now.{Style.RESET_ALL}", file=sys.stderr)
+        sys.exit(1)
     else:
         filename = sys.argv[1]
         output_dir = sys.argv[2]
         if len(sys.argv) > 3:
             window = int(sys.argv[3])
 
-    annotate(open(filename, encoding="utf8"))
+    if not os.path.isdir(output_dir):
+        print(f"{Fore.RED}The output directory is not a valid directory. Exiting now.{Style.RESET_ALL}", file=sys.stderr)
+        sys.exit(1)
+    try:
+        annotate(open(filename, encoding="utf8"))
+    except FileNotFoundError:
+        print(f"{Fore.RED}The file to annotate was not found. Exiting now.{Style.RESET_ALL}", file=sys.stderr)
+        sys.exit(1)
 
 
 """
