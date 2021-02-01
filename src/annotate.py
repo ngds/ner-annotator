@@ -24,6 +24,15 @@ words = []
 annotation_types = [spacy, stanfordnlp, rawtext]
 
 notebook_version = False
+exit_flag = False
+
+def exit():
+    # workaround exit for Jupyter notebook, if necessary
+    if notebook_version:
+        global exit_flag
+        exit_flag = True
+    else:
+        sys.exit(0)
 
 def print_status(token_idx):
     num_blocks_filled = int((token_idx/num_tokens) * 10)
@@ -54,11 +63,11 @@ def get_partial():
             user_choice = int(input("Please type a number on the list (or 0 to start fresh)."))
             if 0 <= user_choice <= len(partial_versions):
                 valid = True
-    if user_choice != 0:
-        global curr_token, internal, filename
-        import pickle
-        internal = pickle.load(open(os.path.join(PARTIAL_ANNS, filename+"-partial-"+partial_versions[user_choice-1]+".pkl"), 'rb'))
-        curr_token = len(internal)
+        if user_choice != 0:
+            global curr_token, internal, filename
+            import pickle
+            internal = pickle.load(open(os.path.join(PARTIAL_ANNS, filename+"-partial-"+partial_versions[user_choice-1]+".pkl"), 'rb'))
+            curr_token = len(internal)
 
 
 def annotate(fp):
@@ -66,20 +75,20 @@ def annotate(fp):
     filename = filename.split("/")[-1].split(".")[0]
     init()
     file = fp.readlines()
-    for line in file:
-        words.extend(line.split())
-        if len(line.split()) > 0:
-            words[-1] += '\n'
-    print(words)
-    num_tokens = len(words)
+    readin(file)
     get_partial()
     while(curr_token < num_tokens):
         get_tag()
 
     compute_all()
 
-    for tok in internal:
-        print(tok)
+def readin(file):
+    global num_tokens, words
+    for line in file:
+        words.extend(line.split())
+        if len(line.split()) > 0:
+            words[-1] += '\n'
+    num_tokens = len(words)
 
 def pause():
     global filename
@@ -88,73 +97,38 @@ def pause():
     print("The annotation progress so far has been saved. To continue annotating this document, simply "
           "select the document as the input document again. The program will ask if you want to use this "
           "set of annotations")
-    sys.exit(0)
-
-
-def print_tags():
-    print("TAG OPTIONS: (press enter to leave untagged, b to go back)")
-    print("0 people, including fictional\t\t4 companies, institutions, etc.")
-    print("1 nationalities, religions\t\t5 countries, cities, states")
-    print("2 mountains, rivers, etc.\t\t6 events--named hurricanes, etc")
-    print("3 buildings, airports, etc.\t\t7 measurements (e.g. weight, distance)")
+    exit()
 
 def setup_doc():
     from src.notebook.file_chooser import doc_loc
     fp = open(doc_loc.selected)
-    global num_tokens, curr_token, internal, filename, words
+    global num_tokens, curr_token, internal, filename, words, notebook_version
+    notebook_version = True
     curr_token = 0
     filename = doc_loc.selected.split("/")[-1].split(".")[0]
     init()
-    file = fp.read()
-    words = file.split()
-    num_tokens = len(words)
+    get_partial()
+    file = fp.readlines()
+    readin(file)
     fp.close()
 
 def takedown():
-    global output_dir
+    global output_dir, exit_flag
+    if exit_flag:
+       return # do nothing, just exit silently
+
     from src.notebook.file_chooser import output_loc
     output_dir = output_loc.selected
     compute_all()
     print("The document has been annotated! Check the output folder to see the annotations saved as files prefixed with \"" + filename + "\"")
 
 def not_done():
-    global curr_token, num_tokens
-    return curr_token < num_tokens
+    global curr_token, num_tokens, exit_flag
+    return not exit_flag and curr_token < num_tokens
 
 def get_tag():
     global back, pos, internal, curr_token, words
     curr_token_word = words[curr_token]
-    print_status(curr_token)
-    print_tags()
-    for j in range(curr_token - window, curr_token):
-        if j >= 0:
-            print(words[j].strip('\n') + " ", end="")
-
-    print(f"{Fore.GREEN} <<" + curr_token_word.strip('\n') + f">> {Style.RESET_ALL}", end="")
-
-    for k in range(curr_token + 1, curr_token + window + 1):
-        if k < len(words):
-            print(" " + words[k].strip('\n'), end="")
-
-    if len(internal) <= curr_token:
-        # add current token to internal list
-        internal.append(Token(words[curr_token], pos, len(words[curr_token])))
-
-    tag = input("\n\tTAG? ")
-    if tag == "b" and curr_token > 0:
-        pos -= internal[curr_token - 1].length + 1 # step back to the beginning of last word
-        curr_token -= 1
-    elif tag == "" or tag in valid_inputs:
-        if tag in valid_inputs:
-            internal[curr_token].tag = tag
-        pos += internal[curr_token].length + 1
-        curr_token += 1
-    else:
-        print(f"\n{Fore.RED}Sorry, not sure what that meant. Try again.{Style.RESET_ALL}")
-    print()
-"""
-def get_tag(curr_token_word, words):
-    global back, pos, internal, curr_token
     print_status(curr_token)
     print_tags()
     for j in range(curr_token - window, curr_token):
@@ -185,7 +159,6 @@ def get_tag(curr_token_word, words):
     else:
         print(f"\n{Fore.RED}Sorry, not sure what that meant. Try again.{Style.RESET_ALL}")
     print()
-"""
 
 
 def compute_all():
@@ -195,10 +168,6 @@ def compute_all():
             output_type.add_annotation(tok)
     for output_type in annotation_types:
         output_type.finalize(output_dir, filename)
-
-def prompt_for_file_or_dir():
-    pass
-
 
 if __name__ == "__main__":
     init()
@@ -219,14 +188,3 @@ if __name__ == "__main__":
     except FileNotFoundError:
         print(f"{Fore.RED}The file to annotate was not found. Exiting now.{Style.RESET_ALL}", file=sys.stderr)
         sys.exit(1)
-
-
-"""
-error handling for files
-write to out formats
-pause mid-annotating file
-strip punctuation from spacy distances ?
-fix line endings
-make going back work for tags
-combine spacy tags
-"""
